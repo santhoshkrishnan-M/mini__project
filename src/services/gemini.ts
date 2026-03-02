@@ -1,7 +1,66 @@
 import { GoogleGenAI } from "@google/genai";
-import { UserProfile, FinancialAdvice, FinancialAdviceSchema, Language } from "../types";
+import { UserProfile, FinancialAdvice, FinancialAdviceSchema, Language, StockNews, StockAnalysis, StockAnalysisSchema } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const STOCK_DATA_API_URL = "https://api.stockdata.org/v1/news?api_token=H10BAGzRcsW5xQbE9hcjfR3492bawn1taTJTGjVS";
+
+export async function getStockMarketAnalysis(): Promise<StockAnalysis> {
+  const ai = getAI();
+  const model = "gemini-3.1-pro-preview";
+
+  // Fetch real-time news
+  const newsResponse = await fetch(STOCK_DATA_API_URL);
+  if (!newsResponse.ok) {
+    throw new Error(`StockData API error: ${newsResponse.statusText}`);
+  }
+  const newsData: StockNews = await newsResponse.json();
+
+  const newsItems = newsData?.data || [];
+  const newsContext = newsItems.length > 0 
+    ? JSON.stringify(newsItems.slice(0, 10))
+    : "No recent news available. Provide general market sentiment based on your knowledge.";
+
+  const prompt = `
+    You are a Personal AI Stock Market Assistant.
+    Analyze the following real-time stock market news and provide structured advice.
+    
+    News Data:
+    ${newsContext}
+
+    Workflow:
+    Step 1 — Market Scan: Identify trending companies and highlight major events.
+    Step 2 — Quick Analysis: For each stock, provide ticker symbol, estimated current price in USD, trend, risk level, and reason.
+    Step 3 — Strategy: Suggest Buy, Watch, Sell, or Long-term hold.
+    Step 4 — Money Strategy: Help user save money, avoid emotional trading, and invest systematically.
+
+    Investment Principles:
+    - Never recommend risky moves without warning.
+    - Encourage diversification.
+    - Suggest SIP / phased investing.
+    - Focus on long-term growth.
+
+    Tone:
+    - Friendly, intelligent, mentor-like.
+    - Behave like Warren Buffett for long-term, a quant for risk, and a mentor for teaching.
+    - Explain everything in simple English.
+    - Do not use emojis.
+    - Ensure the 'symbol' is a valid stock ticker (e.g., AAPL, TSLA, NVDA).
+    - Ensure 'currentPrice' is a realistic number based on the news context.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ parts: [{ text: prompt }] }],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: StockAnalysisSchema,
+      systemInstruction: "You are a Personal AI Stock Market Assistant. You help individual investors make smart, safe decisions. You explain complex concepts in simple English. You never use emojis.",
+    },
+  });
+
+  return JSON.parse(response.text || "{}") as StockAnalysis;
+}
 
 export async function getFinancialAdvice(profile: UserProfile): Promise<FinancialAdvice> {
   const ai = getAI();

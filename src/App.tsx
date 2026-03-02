@@ -35,6 +35,7 @@ import {
 import { UserProfile, FinancialAdvice, Language, RiskTolerance } from './types';
 import { getFinancialAdvice, chatWithFinora } from './services/gemini';
 import { TRANSLATIONS } from './constants';
+import StockAssistant from './components/StockAssistant';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -43,7 +44,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function App() {
-  const [step, setStep] = useState<'welcome' | 'profile' | 'loading' | 'dashboard'>('welcome');
+  const [step, setStep] = useState<'welcome' | 'profile' | 'loading' | 'dashboard' | 'stocks'>('welcome');
   const [language, setLanguage] = useState<Language>(Language.ENGLISH);
   const t = TRANSLATIONS[language];
   const [profile, setProfile] = useState<UserProfile>({
@@ -374,6 +375,23 @@ export default function App() {
                     <ChevronRight size={12} />
                   </button>
                 </div>
+
+                <div 
+                  onClick={() => setStep('stocks')}
+                  className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 cursor-pointer hover:border-[#006A4E]/30 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-gray-400 text-sm font-semibold uppercase tracking-wider">Stock Assistant</span>
+                    <div className="w-8 h-8 rounded-full bg-[#006A4E]/10 flex items-center justify-center text-[#006A4E] group-hover:bg-[#006A4E] group-hover:text-white transition-all">
+                      <TrendingUp size={16} />
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-gray-800">Analyze real-time stock news & opportunities</p>
+                  <div className="flex items-center gap-1 text-xs text-[#006A4E] mt-4 font-bold">
+                    <span>Explore Stocks</span>
+                    <ChevronRight size={12} />
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -523,6 +541,10 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+          )}
+
+          {step === 'stocks' && (
+            <StockAssistant onBack={() => setStep('dashboard')} />
           )}
         </AnimatePresence>
       </main>
