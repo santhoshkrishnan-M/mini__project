@@ -1,13 +1,26 @@
 import { GoogleGenAI } from "@google/genai";
-import { UserProfile, FinancialAdvice, FinancialAdviceSchema, Language, StockNews, StockAnalysis, StockAnalysisSchema } from "../types";
+import { 
+  UserProfile, 
+  FinancialAdvice, 
+  FinancialAdviceSchema, 
+  Language, 
+  StockNews, 
+  StockAnalysis, 
+  StockAnalysisSchema,
+  TradeSuggestion,
+  TradeSuggestionSchema,
+  InvestmentGuidance,
+  InvestmentGuidanceSchema
+} from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL_NAME = "gemini-2.0-flash";
 
 const STOCK_DATA_API_URL = "https://api.stockdata.org/v1/news?api_token=H10BAGzRcsW5xQbE9hcjfR3492bawn1taTJTGjVS";
 
 export async function getStockMarketAnalysis(): Promise<StockAnalysis> {
   const ai = getAI();
-  const model = "gemini-3.1-pro-preview";
+  const model = MODEL_NAME;
 
   // Fetch real-time news
   const newsResponse = await fetch(STOCK_DATA_API_URL);
@@ -64,7 +77,7 @@ export async function getStockMarketAnalysis(): Promise<StockAnalysis> {
 
 export async function getFinancialAdvice(profile: UserProfile): Promise<FinancialAdvice> {
   const ai = getAI();
-  const model = "gemini-3.1-pro-preview";
+  const model = MODEL_NAME;
 
   const prompt = `
     Analyze the following financial profile for an Indian user and provide structured advice in ${profile.language}.
@@ -108,7 +121,7 @@ export async function getFinancialAdvice(profile: UserProfile): Promise<Financia
 
 export async function chatWithFinora(profile: UserProfile, message: string, history: { role: "user" | "model"; parts: { text: string }[] }[]) {
   const ai = getAI();
-  const model = "gemini-3.1-pro-preview";
+  const model = MODEL_NAME;
 
   const chat = ai.chats.create({
     model,
@@ -128,4 +141,75 @@ export async function chatWithFinora(profile: UserProfile, message: string, hist
 
   const result = await chat.sendMessage({ message });
   return result.text;
+}
+
+export async function getMarketExplanation(marketData: any): Promise<string> {
+  const ai = getAI();
+  const model = MODEL_NAME;
+
+  const prompt = `
+    Explain the current market movements based on this data:
+    ${JSON.stringify(marketData)}
+    
+    Provide a simple, clear explanation for a beginner investor. 
+    Focus on WHY things are moving and what it means for the average person.
+    Do not use emojis.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: "You are a financial analyst who explains market trends in simple English.",
+    },
+  });
+
+  return response.text || "Market is stable today.";
+}
+
+export async function getTradeSuggestion(symbol: string, price: number, news: any[]): Promise<TradeSuggestion> {
+  const ai = getAI();
+  const model = MODEL_NAME;
+
+  const prompt = `
+    Analyze the stock ${symbol} currently priced at $${price}.
+    Recent news: ${JSON.stringify(news)}
+    
+    Decide if the user should Buy, Sell, or Hold.
+    Provide confidence level (0-1), reasoning, risk level, and suggested target/stop-loss.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ parts: [{ text: prompt }] }],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: TradeSuggestionSchema,
+      systemInstruction: "You are a professional trading assistant. You provide data-driven buy/sell/hold suggestions.",
+    },
+  });
+
+  return JSON.parse(response.text || "{}") as TradeSuggestion;
+}
+
+export async function getInvestmentGuidance(type: "SIP" | "SWP" | "FD" | "Mutual Funds"): Promise<InvestmentGuidance> {
+  const ai = getAI();
+  const model = MODEL_NAME;
+
+  const prompt = `
+    Provide comprehensive guidance for ${type} investments in the Indian context.
+    Include description, expected returns, risk level, AI advice, and a comparison with other options.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ parts: [{ text: prompt }] }],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: InvestmentGuidanceSchema,
+      systemInstruction: "You are an expert investment advisor specializing in Indian financial instruments.",
+    },
+  });
+
+  return JSON.parse(response.text || "{}") as InvestmentGuidance;
 }

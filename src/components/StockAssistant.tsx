@@ -35,6 +35,7 @@ function cn(...inputs: ClassValue[]) {
 
 interface StockAssistantProps {
   onBack: () => void;
+  t: any;
 }
 
 const INITIAL_PORTFOLIO: UserPortfolio = {
@@ -42,7 +43,7 @@ const INITIAL_PORTFOLIO: UserPortfolio = {
   items: []
 };
 
-export default function StockAssistant({ onBack }: StockAssistantProps) {
+export default function StockAssistant({ onBack, t }: StockAssistantProps) {
   const [analysis, setAnalysis] = useState<StockAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
         setAnalysis(result);
       } catch (err: any) {
         console.error('Error fetching stock analysis:', err);
-        setError(err.message || 'Failed to load market analysis. Please try again later.');
+        setError(err.message || t.failedToLoadAISuggestion);
       } finally {
         setLoading(false);
       }
@@ -80,7 +81,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
   const handleBuy = (stock: { symbol: string, stock: string, currentPrice: number }) => {
     const cost = stock.currentPrice;
     if (portfolio.balance < cost) {
-      showNotification("Insufficient balance to buy this stock.", "error");
+      showNotification(t.insufficientBalance, "error");
       return;
     }
 
@@ -112,13 +113,13 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
         items: newItems
       };
     });
-    showNotification(`Successfully bought 1 share of ${stock.symbol}`, "success");
+    showNotification(`${t.successfullyBought} 1 ${t.shareOf} ${stock.symbol}`, "success");
   };
 
   const handleSell = (symbol: string, price: number) => {
     const existingItem = portfolio.items.find(item => item.symbol === symbol);
     if (!existingItem || existingItem.quantity <= 0) {
-      showNotification("You don't own any shares of this stock.", "error");
+      showNotification(t.noSharesOwned, "error");
       return;
     }
 
@@ -134,7 +135,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
         items: newItems
       };
     });
-    showNotification(`Successfully sold 1 share of ${symbol}`, "success");
+    showNotification(`${t.successfullySold} 1 ${t.shareOf} ${symbol}`, "success");
   };
 
   if (loading) {
@@ -146,8 +147,8 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
             <BarChart3 size={24} className="text-[#006A4E]" />
           </div>
         </div>
-        <h2 className="text-2xl font-serif font-bold mt-8 mb-2">Scanning Global Markets...</h2>
-        <p className="text-gray-500">Analyzing real-time news and detecting opportunities.</p>
+        <h2 className="text-2xl font-serif font-bold mt-8 mb-2">{t.analyzing}</h2>
+        <p className="text-gray-500">{t.thinking}</p>
       </div>
     );
   }
@@ -157,13 +158,13 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
       <div className="text-center py-20">
         <div className="bg-red-50 p-8 rounded-3xl border border-red-100 inline-block max-w-md">
           <AlertTriangle className="text-red-500 mx-auto mb-4" size={48} />
-          <h3 className="text-xl font-bold text-red-700 mb-2">Analysis Error</h3>
-          <p className="text-red-600 mb-6">{error || 'Failed to load market analysis. Please try again later.'}</p>
+          <h3 className="text-xl font-bold text-red-700 mb-2">{t.analysisError}</h3>
+          <p className="text-red-600 mb-6">{error || t.failedToLoadAISuggestion}</p>
           <button 
             onClick={onBack} 
             className="bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700 transition-colors"
           >
-            Go Back
+            {t.goBack}
           </button>
         </div>
       </div>
@@ -203,7 +204,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-3xl font-serif font-bold">Stock Assistant</h1>
+          <h1 className="text-3xl font-serif font-bold">{t.aiAdvice}</h1>
         </div>
         <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl">
           <button 
@@ -213,7 +214,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               activeTab === 'market' ? "bg-white shadow-sm text-[#006A4E]" : "text-gray-500 hover:text-gray-700"
             )}
           >
-            Market
+            {t.marketOverview}
           </button>
           <button 
             onClick={() => setActiveTab('portfolio')}
@@ -222,7 +223,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               activeTab === 'portfolio' ? "bg-white shadow-sm text-[#006A4E]" : "text-gray-500 hover:text-gray-700"
             )}
           >
-            Portfolio
+            {t.portfolioHoldings}
           </button>
         </div>
       </div>
@@ -231,23 +232,23 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-2 text-gray-400">
             <Wallet size={18} />
-            <span className="text-xs font-bold uppercase tracking-wider">Available Balance</span>
+            <span className="text-xs font-bold uppercase tracking-wider">{t.cashBalance}</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">${portfolio.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div className="text-2xl font-bold text-gray-900">₹{portfolio.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-2 text-gray-400">
             <Briefcase size={18} />
-            <span className="text-xs font-bold uppercase tracking-wider">Portfolio Value</span>
+            <span className="text-xs font-bold uppercase tracking-wider">{t.investedValue}</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div className="text-2xl font-bold text-gray-900">₹{portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
         <div className="bg-[#006A4E] p-6 rounded-3xl shadow-sm text-white">
           <div className="flex items-center gap-3 mb-2 text-white/60">
             <TrendingUp size={18} />
-            <span className="text-xs font-bold uppercase tracking-wider">Total Wealth</span>
+            <span className="text-xs font-bold uppercase tracking-wider">{t.totalWealth}</span>
           </div>
-          <div className="text-2xl font-bold">${totalWealth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div className="text-2xl font-bold">₹{totalWealth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
       </div>
 
@@ -256,7 +257,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
             <h2 className="text-2xl font-serif font-bold mb-4 flex items-center gap-3">
               <Search className="indian-accent" />
-              Market Summary
+              {t.marketOverview}
             </h2>
             <p className="text-gray-700 leading-relaxed">
               {analysis.marketSummary}
@@ -267,7 +268,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
             <div className="lg:col-span-2 space-y-6">
               <h3 className="text-xl font-serif font-bold flex items-center gap-2">
                 <TrendingUp className="indian-accent" />
-                Top Opportunities
+                {t.topGainers}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {analysis.topOpportunities.map((opportunity, i) => (
@@ -287,13 +288,13 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold">${opportunity.currentPrice.toFixed(2)}</div>
+                        <div className="text-lg font-bold">₹{opportunity.currentPrice.toFixed(2)}</div>
                         <div className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-bold inline-block",
                           opportunity.risk === "Low" ? "bg-green-500 text-white" : 
                           opportunity.risk === "Medium" ? "bg-yellow-500 text-white" : "bg-red-500 text-white"
                         )}>
-                          {opportunity.risk} Risk
+                          {opportunity.risk} {t.riskLevel}
                         </div>
                       </div>
                     </div>
@@ -309,14 +310,14 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                           className="flex items-center justify-center gap-2 bg-[#006A4E] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-[#005a42] transition-colors"
                         >
                           <Plus size={16} />
-                          Buy
+                          {t.buy}
                         </button>
                         <button 
                           onClick={() => handleSell(opportunity.symbol, opportunity.currentPrice)}
                           className="flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2.5 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
                         >
                           <Minus size={16} />
-                          Sell
+                          {t.sell}
                         </button>
                       </div>
                     </div>
@@ -329,7 +330,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
                 <h4 className="font-bold flex items-center gap-2 mb-4 text-gray-800">
                   <BarChart3 size={20} className="text-blue-500" />
-                  Stocks to Watch
+                  {t.marketSentiment}
                 </h4>
                 <ul className="space-y-3">
                   {analysis.stocksToWatch.map((stock, i) => (
@@ -344,7 +345,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               <div className="bg-red-50 rounded-3xl p-6 border border-red-100">
                 <h4 className="text-red-700 font-bold flex items-center gap-2 mb-4">
                   <AlertTriangle size={20} />
-                  Risk Alerts
+                  {t.riskLevel}
                 </h4>
                 <ul className="space-y-3">
                   {analysis.riskAlerts.map((alert, i) => (
@@ -359,7 +360,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               <div className="bg-amber-50 rounded-3xl p-6 border border-amber-100">
                 <h4 className="text-amber-700 font-bold flex items-center gap-2 mb-4">
                   <Lightbulb size={20} />
-                  Smart Money Tips
+                  {t.aiAdvice}
                 </h4>
                 <ul className="space-y-3">
                   {analysis.smartMoneyTips.map((tip, i) => (
@@ -377,8 +378,8 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
         <div className="space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="text-xl font-serif font-bold">My Holdings</h3>
-              <div className="text-sm text-gray-400 font-bold">{portfolio.items.length} Positions</div>
+              <h3 className="text-xl font-serif font-bold">{t.portfolioHoldings}</h3>
+              <div className="text-sm text-gray-400 font-bold">{portfolio.items.length} {t.positions}</div>
             </div>
             {portfolio.items.length > 0 ? (
               <div className="overflow-x-auto">
@@ -387,9 +388,9 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                     <tr className="bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                       <th className="px-6 py-4">Stock</th>
                       <th className="px-6 py-4 text-right">Qty</th>
-                      <th className="px-6 py-4 text-right">Avg Price</th>
-                      <th className="px-6 py-4 text-right">Current</th>
-                      <th className="px-6 py-4 text-right">P&L</th>
+                      <th className="px-6 py-4 text-right">{t.avgPrice}</th>
+                      <th className="px-6 py-4 text-right">{t.currentPrice}</th>
+                      <th className="px-6 py-4 text-right">{t.pnl}</th>
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -404,8 +405,8 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                             <div className="text-xs text-gray-400">{item.name}</div>
                           </td>
                           <td className="px-6 py-4 text-right font-medium">{item.quantity}</td>
-                          <td className="px-6 py-4 text-right font-medium">${item.avgPrice.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-right font-medium">${item.currentPrice.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-right font-medium">₹{item.avgPrice.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-right font-medium">₹{item.currentPrice.toFixed(2)}</td>
                           <td className="px-6 py-4 text-right">
                             <div className={cn(
                               "font-bold flex flex-col items-end",
@@ -413,7 +414,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                             )}>
                               <div className="flex items-center gap-1">
                                 {pnl >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                                ${Math.abs(pnl).toFixed(2)}
+                                ₹{Math.abs(pnl).toFixed(2)}
                               </div>
                               <div className="text-[10px]">{pnlPercent.toFixed(2)}%</div>
                             </div>
@@ -423,7 +424,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
                               onClick={() => handleSell(item.symbol, item.currentPrice)}
                               className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors"
                             >
-                              Sell 1
+                              {t.sell} 1
                             </button>
                           </td>
                         </tr>
@@ -435,7 +436,7 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
             ) : (
               <div className="p-20 text-center">
                 <Briefcase size={48} className="text-gray-200 mx-auto mb-4" />
-                <p className="text-gray-400 font-medium">Your portfolio is empty. Start investing from the Market tab!</p>
+                <p className="text-gray-400 font-medium">{t.heroDesc}</p>
               </div>
             )}
           </div>
@@ -445,12 +446,9 @@ export default function StockAssistant({ onBack }: StockAssistantProps) {
               <Zap size={32} />
             </div>
             <div className="flex-grow text-center md:text-left">
-              <h4 className="text-xl font-bold text-blue-900 mb-1">Upgrade to Pro</h4>
-              <p className="text-blue-700 text-sm">Connect your real brokerage account to execute actual trades directly from Finora. Get advanced technical indicators and real-time order execution.</p>
+              <h4 className="text-xl font-bold text-blue-900 mb-1">{t.securePrivate}</h4>
+              <p className="text-blue-700 text-sm">{t.disclaimer}</p>
             </div>
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-200 shrink-0">
-              Learn More
-            </button>
           </div>
         </div>
       )}

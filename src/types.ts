@@ -175,3 +175,54 @@ export const StockAnalysisSchema = {
   },
   required: ["marketSummary", "topOpportunities", "stocksToWatch", "riskAlerts", "smartMoneyTips"],
 };
+
+export interface MarketData {
+  topGainers: Array<{ symbol: string; name: string; price: number; change: number; changePercent: number }>;
+  topLosers: Array<{ symbol: string; name: string; price: number; change: number; changePercent: number }>;
+  trending: Array<{ symbol: string; name: string; price: number; change: number; changePercent: number }>;
+  news: StockNews['data'];
+}
+
+export interface InvestmentGuidance {
+  title: string;
+  description: string;
+  expectedReturns: string;
+  riskLevel: string;
+  aiAdvice: string;
+  comparison: string;
+}
+
+export const InvestmentGuidanceSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    description: { type: Type.STRING },
+    expectedReturns: { type: Type.STRING },
+    riskLevel: { type: Type.STRING },
+    aiAdvice: { type: Type.STRING },
+    comparison: { type: Type.STRING },
+  },
+  required: ["title", "description", "expectedReturns", "riskLevel", "aiAdvice", "comparison"],
+};
+
+export interface TradeSuggestion {
+  action: "Buy" | "Sell" | "Hold";
+  confidence: number;
+  reasoning: string;
+  riskLevel: "Low" | "Medium" | "High";
+  targetPrice?: number;
+  stopLoss?: number;
+}
+
+export const TradeSuggestionSchema = {
+  type: Type.OBJECT,
+  properties: {
+    action: { type: Type.STRING, enum: ["Buy", "Sell", "Hold"] },
+    confidence: { type: Type.NUMBER },
+    reasoning: { type: Type.STRING },
+    riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High"] },
+    targetPrice: { type: Type.NUMBER },
+    stopLoss: { type: Type.NUMBER },
+  },
+  required: ["action", "confidence", "reasoning", "riskLevel"],
+};
