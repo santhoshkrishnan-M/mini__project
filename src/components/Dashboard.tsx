@@ -40,8 +40,14 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
       try {
         const data = await fetchMarketData();
         setMarketData(data);
-        const expl = await getMarketExplanation(data);
-        setExplanation(expl);
+        try {
+          const expl = await getMarketExplanation(data);
+          setExplanation(expl);
+        } catch (aiError) {
+          console.error("AI explanation error:", aiError);
+          // Provide default explanation on quota error
+          setExplanation("Market data is showing mixed signals today. Review the top gainers and losers below for insights. Focus on diversified investments and long-term strategies.");
+        }
       } catch (error) {
         console.error("Error loading dashboard data:", error);
       } finally {
@@ -124,7 +130,7 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
                       {stock.changePercent.toFixed(2)}%
                     </span>
                   </div>
-                  <div className="text-lg font-bold">${stock.price.toFixed(2)}</div>
+                  <div className="text-lg font-bold">₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   <div className="text-xs text-gray-400 mt-1">{stock.name}</div>
                 </div>
               ))}
@@ -157,7 +163,7 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
                       <div className="text-xs text-gray-400">{stock.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold">${stock.price.toFixed(2)}</div>
+                      <div className="font-bold">₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-green-600 font-bold">+{stock.changePercent.toFixed(2)}%</div>
                     </div>
                   </div>
@@ -178,7 +184,7 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
                       <div className="text-xs text-gray-400">{stock.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold">${stock.price.toFixed(2)}</div>
+                      <div className="font-bold">₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-red-600 font-bold">{stock.changePercent.toFixed(2)}%</div>
                     </div>
                   </div>
@@ -195,21 +201,60 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
               <Newspaper size={20} className="text-blue-500" />
               {t.latestNews}
             </h3>
-            <div className="space-y-6">
-              {marketData?.news.slice(0, 5).map((item, i) => (
-                <a 
-                  key={i} 
-                  href={item.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block group"
-                >
-                  <div className="text-xs text-gray-400 mb-1">{item.source} • {new Date(item.published_at).toLocaleTimeString()}</div>
-                  <h4 className="text-sm font-bold group-hover:text-[#006A4E] transition-colors line-clamp-2">
-                    {item.title}
-                  </h4>
-                </a>
-              ))}
+            <div className="space-y-4">
+              {marketData?.news && marketData.news.length > 0 ? (
+                marketData.news.slice(0, 8).map((item, i) => {
+                  const publishedDate = new Date(item.published_at);
+                  const now = new Date();
+                  const diffInHours = Math.floor((now.getTime() - publishedDate.getTime()) / (1000 * 60 * 60));
+                  const timeAgo = diffInHours < 1 
+                    ? t.justNow || 'Just now'
+                    : diffInHours < 24 
+                      ? (t.hoursAgo || '{hours}h ago').replace('{hours}', diffInHours.toString())
+                      : (t.daysAgo || '{days}d ago').replace('{days}', Math.floor(diffInHours / 24).toString());
+
+                  return (
+                    <a 
+                      key={i} 
+                      href={item.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block group border-b border-gray-100 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div className="flex items-start gap-3">
+                        {item.image_url && (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.title}
+                            className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-blue-600">{item.source}</span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-400">{timeAgo}</span>
+                          </div>
+                          <h4 className="text-sm font-bold group-hover:text-[#006A4E] transition-colors line-clamp-2 mb-1">
+                            {item.title}
+                          </h4>
+                          {item.snippet && (
+                            <p className="text-xs text-gray-500 line-clamp-2">
+                              {item.snippet}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <Newspaper size={32} className="text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">{t.noNewsAvailable || 'No news available at the moment'}</p>
+                </div>
+              )}
             </div>
           </div>
 

@@ -21,6 +21,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
+import { Language } from '../types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -28,7 +29,13 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export default function Portfolio({ t }: { t: any }) {
+interface PortfolioProps {
+  t: any;
+  setLanguage: (lang: Language) => void;
+  currentLanguage: Language;
+}
+
+export default function Portfolio({ t, setLanguage, currentLanguage }: PortfolioProps) {
   const [data, setData] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

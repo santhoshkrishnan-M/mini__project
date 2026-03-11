@@ -13,8 +13,10 @@ import {
   InvestmentGuidanceSchema
 } from "../types";
 
-const getAI = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL_NAME = "gemini-2.0-flash";
+const getAI = () => new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY
+});
+const MODEL_NAME = "gemini-2.5-flash";
 
 const STOCK_DATA_API_URL = "https://api.stockdata.org/v1/news?api_token=H10BAGzRcsW5xQbE9hcjfR3492bawn1taTJTGjVS";
 

@@ -13,11 +13,13 @@ import {
   X,
   ShieldCheck,
   AlertTriangle,
-  Info
+  Info,
+  Activity,
+  RefreshCw
 } from 'lucide-react';
-import { searchStocks } from '../services/stockApi';
+import { searchStocks, fetchMarketData } from '../services/stockApi';
 import { getTradeSuggestion } from '../services/gemini';
-import { TradeSuggestion } from '../types';
+import { TradeSuggestion, Language } from '../types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -25,13 +27,48 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export default function MarketExplorer({ t }: { t: any }) {
+interface MarketExplorerProps {
+  t: any;
+  setLanguage: (lang: Language) => void;
+  currentLanguage: Language;
+}
+
+export default function MarketExplorer({ t, setLanguage, currentLanguage }: MarketExplorerProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedStock, setSelectedStock] = useState<any | null>(null);
   const [suggestion, setSuggestion] = useState<TradeSuggestion | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [marketData, setMarketData] = useState<any>(null);
+  const [loadingMarket, setLoadingMarket] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load market overview on mount
+  useEffect(() => {
+    loadMarketData();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadMarketData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadMarketData = async () => {
+    try {
+      setLoadingMarket(true);
+      const data = await fetchMarketData();
+      setMarketData(data);
+    } catch (error) {
+      console.error("Error loading market data:", error);
+    } finally {
+      setLoadingMarket(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadMarketData();
+  };
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -56,6 +93,16 @@ export default function MarketExplorer({ t }: { t: any }) {
       setSuggestion(sugg);
     } catch (error) {
       console.error("Error getting trade suggestion:", error);
+      // Provide default suggestion on quota error
+      const defaultSuggestion: TradeSuggestion = {
+        action: stock.changePercent > 2 ? "Hold" : stock.changePercent < -2 ? "Watch" : "Hold",
+        reasoning: "AI analysis temporarily unavailable. Research thoroughly before investing. Consider the stock's fundamentals, market position, and your investment goals.",
+        confidence: 0.5,
+        targetPrice: stock.price * 1.1,
+        stopLoss: stock.price * 0.95,
+        riskLevel: "Medium"
+      };
+      setSuggestion(defaultSuggestion);
     } finally {
       setLoadingSuggestion(false);
     }
@@ -92,6 +139,99 @@ export default function MarketExplorer({ t }: { t: any }) {
 
   return (
     <div className="space-y-8">
+      {/* Market Sentiment Overview */}
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#006A4E]/10 rounded-xl text-[#006A4E]">
+              <Activity size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-serif font-bold text-gray-900">Market Sentiment</h2>
+              <p className="text-sm text-gray-500">Real-time NSE market overview</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-3 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={20} className={cn("text-gray-600", refreshing && "animate-spin")} />
+          </button>
+        </div>
+
+        {loadingMarket ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-[#006A4E]" size={32} />
+          </div>
+        ) : marketData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Top Gainers */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="text-green-600" size={20} />
+                <h3 className="font-bold text-lg text-gray-900">Top Gainers</h3>
+              </div>
+              <div className="space-y-3">
+                {marketData.topGainers?.slice(0, 5).map((stock: any) => (
+                  <div 
+                    key={stock.symbol}
+                    className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100 hover:border-green-300 transition-colors cursor-pointer"
+                    onClick={() => handleSelectStock(stock)}
+                  >
+                    <div>
+                      <div className="font-bold text-gray-900">{stock.symbol}</div>
+                      <div className="text-xs text-gray-500">{stock.name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-900">₹{stock.price.toFixed(2)}</div>
+                      <div className="text-xs text-green-600 font-bold flex items-center gap-1">
+                        <ArrowUpRight size={12} />
+                        +{stock.changePercent.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Losers */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingDown className="text-red-600" size={20} />
+                <h3 className="font-bold text-lg text-gray-900">Top Losers</h3>
+              </div>
+              <div className="space-y-3">
+                {marketData.topLosers?.slice(0, 5).map((stock: any) => (
+                  <div 
+                    key={stock.symbol}
+                    className="flex items-center justify-between p-4 bg-red-50 rounded-2xl border border-red-100 hover:border-red-300 transition-colors cursor-pointer"
+                    onClick={() => handleSelectStock(stock)}
+                  >
+                    <div>
+                      <div className="font-bold text-gray-900">{stock.symbol}</div>
+                      <div className="text-xs text-gray-500">{stock.name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-900">₹{stock.price.toFixed(2)}</div>
+                      <div className="text-xs text-red-600 font-bold flex items-center gap-1">
+                        <ArrowDownRight size={12} />
+                        {stock.changePercent.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            Failed to load market data
+          </div>
+        )}
+      </div>
+
+      {/* Stock Search */}
       <div className="relative max-w-2xl mx-auto">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input 
@@ -126,10 +266,13 @@ export default function MarketExplorer({ t }: { t: any }) {
                   <p className="text-sm text-gray-400">{stock.name}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold">${stock.price.toFixed(2)}</div>
-                  <div className="text-xs text-green-600 font-bold flex items-center justify-end gap-1">
-                    <ArrowUpRight size={12} />
-                    +1.2%
+                  <div className="text-lg font-bold">₹{stock.price.toFixed(2)}</div>
+                  <div className={cn(
+                    "text-xs font-bold flex items-center justify-end gap-1",
+                    stock.changePercent >= 0 ? "text-green-600" : "text-red-600"
+                  )}>
+                    {stock.changePercent >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                    {stock.changePercent >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%
                   </div>
                 </div>
               </div>
@@ -175,27 +318,30 @@ export default function MarketExplorer({ t }: { t: any }) {
                   {/* Price & Chart Placeholder */}
                   <div className="space-y-6">
                     <div className="flex items-baseline gap-4">
-                      <span className="text-5xl font-bold">${selectedStock.price.toFixed(2)}</span>
-                      <span className="text-green-600 font-bold flex items-center gap-1">
-                        <ArrowUpRight size={20} />
-                        +1.24%
+                      <span className="text-5xl font-bold">₹{selectedStock.price.toFixed(2)}</span>
+                      <span className={cn(
+                        "font-bold flex items-center gap-1",
+                        selectedStock.changePercent >= 0 ? "text-green-600" : "text-red-600"
+                      )}>
+                        {selectedStock.changePercent >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                        {selectedStock.changePercent >= 0 ? "+" : ""}{selectedStock.changePercent.toFixed(2)}%
                       </span>
                     </div>
                     
                     <div className="bg-gray-50 rounded-3xl h-64 flex items-center justify-center border border-gray-100 relative overflow-hidden">
                       <BarChart3 size={48} className="text-gray-200" />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-50/80 to-transparent" />
-                      <span className="absolute bottom-4 text-xs font-bold text-gray-400 uppercase tracking-widest">{t.liveChartPlaceholder}</span>
+                      <span className="absolute bottom-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Live Chart (Coming Soon)</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                         <div className="text-xs text-gray-400 font-bold uppercase mb-1">Day High</div>
-                        <div className="font-bold">${(selectedStock.price * 1.02).toFixed(2)}</div>
+                        <div className="font-bold">₹{(selectedStock.price * 1.02).toFixed(2)}</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                         <div className="text-xs text-gray-400 font-bold uppercase mb-1">Day Low</div>
-                        <div className="font-bold">${(selectedStock.price * 0.98).toFixed(2)}</div>
+                        <div className="font-bold">₹{(selectedStock.price * 0.98).toFixed(2)}</div>
                       </div>
                     </div>
                   </div>

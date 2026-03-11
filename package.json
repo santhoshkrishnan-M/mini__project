@@ -1,8 +1,14 @@
 {
-  "name": "react-example",
+  "name": "finora",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "AI-Powered Intelligent Investing Platform with Gemini 2.0 Flash",
+  "author": "FINORA Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/santhoshkrishnan-M/mini__project.git"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",

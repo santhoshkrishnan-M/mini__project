@@ -26,7 +26,9 @@ import {
   Menu,
   X,
   Zap,
-  Bell
+  Bell,
+  Languages,
+  Globe
 } from 'lucide-react';
 import { UserProfile, FinancialAdvice, Language, RiskTolerance } from './types';
 import { getFinancialAdvice, chatWithFinora } from './services/gemini';
@@ -48,7 +50,10 @@ type MainTab = 'dashboard' | 'market' | 'portfolio' | 'investments';
 export default function App() {
   const [step, setStep] = useState<AppStep>('welcome');
   const [activeTab, setActiveTab] = useState<MainTab>('dashboard');
-  const [language, setLanguage] = useState<Language>(Language.ENGLISH);
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem('finora_language');
+    return saved ? (saved as Language) : Language.ENGLISH;
+  });
   const t = TRANSLATIONS[language];
   
   const [profile, setProfile] = useState<UserProfile>(() => {
@@ -73,10 +78,15 @@ export default function App() {
   const [currentInput, setCurrentInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem('finora_profile', JSON.stringify(profile));
   }, [profile]);
+
+  useEffect(() => {
+    localStorage.setItem('finora_language', language);
+  }, [language]);
 
   const handleStart = () => {
     setStep('profile');
@@ -84,15 +94,65 @@ export default function App() {
 
   const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setStep('loading');
     try {
+      console.log('Fetching financial advice with profile:', profile);
       const result = await getFinancialAdvice({ ...profile, language });
+      console.log('Received advice:', result);
       setAdvice(result);
       setStep('main');
     } catch (error) {
       console.error('Error getting advice:', error);
-      setStep('profile');
+      // If quota exceeded, provide default advice and continue
+      if (error instanceof Error && (error.message.includes('quota') || error.message.includes('429'))) {
+        setAdvice(getDefaultAdvice(profile));
+        setError(t.aiQuotaExceeded);
+        setStep('main');
+      } else {
+        setError(t.failedToGenerateAdvice);
+        setStep('profile');
+      }
     }
+  };
+
+  const handleSkipAI = () => {
+    setAdvice(getDefaultAdvice(profile));
+    setError(null);
+    setStep('main');
+  };
+
+  const getDefaultAdvice = (profile: UserProfile) => {
+    const monthlySavings = profile.monthlyIncome - profile.monthlyExpenses;
+    const emergencyFund = profile.monthlyExpenses * 6;
+    const suggestedSIP = Math.floor(monthlySavings * 0.3);
+    
+    return {
+      healthScore: 65,
+      recommendedMonthlySavings: monthlySavings,
+      suggestedSIPAmount: suggestedSIP,
+      emergencyFundTarget: emergencyFund,
+      budgetPlan: {
+        necessities: profile.monthlyExpenses,
+        wants: Math.floor(monthlySavings * 0.3),
+        savings: Math.floor(monthlySavings * 0.7)
+      },
+      investmentSuggestions: [
+        'Consider starting a SIP in index funds',
+        'Build emergency fund covering 6 months expenses',
+        'Diversify across equity, debt, and gold',
+        'Review and rebalance portfolio quarterly'
+      ],
+      retirementReadiness: 'Start investing early for long-term wealth',
+      riskWarnings: profile.debt > 0 ? ['Pay off high-interest debt first'] : ['Avoid taking unnecessary debt'],
+      fraudAwarenessTips: [
+        'Never share OTP or bank passwords',
+        'Verify investment schemes with SEBI',
+        'Beware of guaranteed return promises'
+      ],
+      keyAdvice: `With ₹${monthlySavings.toLocaleString('en-IN')} monthly savings, focus on building emergency fund and systematic investing.`,
+      nextBestAction: 'Start with emergency fund, then begin SIP investments'
+    };
   };
 
   const handleSendMessage = async () => {
@@ -108,6 +168,9 @@ export default function App() {
       setChatMessages(prev => [...prev, { role: 'model', parts: [{ text: response || 'I am sorry, I could not process that.' }] }]);
     } catch (error) {
       console.error('Chat error:', error);
+      // Provide fallback response on quota error
+      const fallbackMsg = 'AI chat is temporarily unavailable due to quota limits. However, you can still use Market Explorer, Portfolio, and other core features!';
+      setChatMessages(prev => [...prev, { role: 'model', parts: [{ text: fallbackMsg }] }]);
     } finally {
       setIsChatLoading(false);
     }
@@ -119,6 +182,17 @@ export default function App() {
     { id: 'portfolio', label: t.portfolioHoldings, icon: <Briefcase size={20} /> },
     { id: 'investments', label: t.investmentPlanning, icon: <PiggyBank size={20} /> },
   ];
+
+  const languageDisplayNames: Record<Language, string> = {
+    [Language.ENGLISH]: "English",
+    [Language.HINDI]: "हिन्दी (Hindi)",
+    [Language.TAMIL]: "தமிழ் (Tamil)",
+    [Language.TELUGU]: "తెలుగు (Telugu)",
+    [Language.KANNADA]: "ಕನ್ನಡ (Kannada)",
+    [Language.MALAYALAM]: "മലയാളം (Malayalam)",
+    [Language.MARATHI]: "मराठी (Marathi)",
+    [Language.BENGALI]: "বাংলা (Bengali)",
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
@@ -167,21 +241,29 @@ export default function App() {
           )}
           
           <div className="relative group">
-            <button className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors text-sm font-bold text-gray-600">
-              <BookOpen size={18} className="text-[#006A4E]" />
-              <span>{language}</span>
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 rounded-2xl transition-all text-sm font-bold text-gray-700 shadow-sm border border-gray-100 hover:border-[#006A4E]/30">
+              <Globe size={18} className="text-[#006A4E]" />
+              <span className="hidden sm:inline">{languageDisplayNames[language]}</span>
+              <span className="sm:hidden">{language}</span>
+              <ChevronRight size={16} className="rotate-90 text-gray-400" />
             </button>
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 py-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 max-h-96 overflow-y-auto">
+              <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 mb-2">
+                {t.preferredLanguage || 'Select Language'}
+              </div>
               {Object.values(Language).map(lang => (
                 <button
                   key={lang}
                   onClick={() => setLanguage(lang as Language)}
                   className={cn(
-                    "w-full text-left px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors",
-                    language === lang ? "text-[#006A4E] bg-green-50" : "text-gray-600"
+                    "w-full text-left px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-all flex items-center justify-between group/item",
+                    language === lang ? "text-[#006A4E] bg-green-50 font-bold" : "text-gray-700"
                   )}
                 >
-                  {lang}
+                  <span>{languageDisplayNames[lang]}</span>
+                  {language === lang && (
+                    <CheckCircle2 size={16} className="text-[#006A4E]" />
+                  )}
                 </button>
               ))}
             </div>
@@ -381,13 +463,33 @@ export default function App() {
                     />
                   </div>
 
-                  <button 
-                    type="submit"
-                    className="w-full bg-[#006A4E] text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-[#006A4E]/20 hover:bg-[#005a42] transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>{t.analyzeContinue}</span>
-                    <ChevronRight size={20} />
-                  </button>
+                  {error && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                      <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-amber-900 mb-1">Notice</p>
+                        <p className="text-sm text-amber-700">{error}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4">
+                    <button 
+                      type="submit"
+                      className="flex-1 bg-[#006A4E] text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-[#006A4E]/20 hover:bg-[#005a42] transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>{t.analyzeContinue}</span>
+                      <ChevronRight size={20} />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleSkipAI}
+                      className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>{t.skipAIAnalysis}</span>
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
                 </form>
               </div>
             </motion.div>
@@ -420,9 +522,9 @@ export default function App() {
               className="space-y-8"
             >
               {activeTab === 'dashboard' && <Dashboard t={t} setLanguage={setLanguage} currentLanguage={language} />}
-              {activeTab === 'market' && <MarketExplorer t={t} />}
-              {activeTab === 'portfolio' && <Portfolio t={t} />}
-              {activeTab === 'investments' && <InvestmentHub t={t} />}
+              {activeTab === 'market' && <MarketExplorer t={t} setLanguage={setLanguage} currentLanguage={language} />}
+              {activeTab === 'portfolio' && <Portfolio t={t} setLanguage={setLanguage} currentLanguage={language} />}
+              {activeTab === 'investments' && <InvestmentHub t={t} setLanguage={setLanguage} currentLanguage={language} />}
             </motion.div>
           )}
         </AnimatePresence>
