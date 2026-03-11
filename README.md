@@ -51,6 +51,8 @@ A complete stock market platform integrated with **Gemini 2.0 Flash**, providing
    GEMINI_API_KEY=your_gemini_api_key_here
    KITE_API_KEY=your_kite_api_key_here
    KITE_API_SECRET=your_kite_api_secret_here
+   STOCK_DATA_API_KEY=your_stock_data_api_key_here
+   NEWS_API_KEY=your_news_api_key_here
    ```
 
 4. **Run the development server**

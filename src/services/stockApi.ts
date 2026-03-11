@@ -1,8 +1,8 @@
 import { MarketData, StockNews } from "../types";
 
-const STOCK_DATA_API_KEY = "H10BAGzRcsW5xQbE9hcjfR3492bawn1taTJTGjVS";
+const STOCK_DATA_API_KEY = process.env.STOCK_DATA_API_KEY || "";
 const BASE_URL = "https://api.stockdata.org/v1";
-const NEWS_API_KEY = "b917c0fff04f450cbc6abf75dfc72e59"; // Free NewsAPI key for financial news
+const NEWS_API_KEY = process.env.NEWS_API_KEY || ""; // NewsAPI key for financial news
 
 // Fetch financial news from NewsAPI
 async function fetchFinancialNews(): Promise<StockNews['data']> {
