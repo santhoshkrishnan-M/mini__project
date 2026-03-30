@@ -78,6 +78,7 @@ export default function App() {
   const [currentInput, setCurrentInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLogoImage, setShowLogoImage] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -208,8 +209,17 @@ export default function App() {
             </button>
           )}
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#006A4E] rounded-xl flex items-center justify-center text-white shadow-lg">
-              <TrendingUp size={24} />
+            <div className="w-10 h-10 bg-[#1F1815] rounded-xl flex items-center justify-center text-white shadow-lg">
+              {showLogoImage ? (
+                <img
+                  src="/logo-new.png"
+                  alt="Finora logo"
+                  className="w-full h-full object-contain"
+                  onError={() => setShowLogoImage(false)}
+                />
+              ) : (
+                <TrendingUp size={24} />
+              )}
             </div>
             <span className="text-2xl font-serif font-bold tracking-tight text-[#006A4E]">FINORA</span>
           </div>
@@ -298,8 +308,17 @@ export default function App() {
               className="fixed left-0 top-0 bottom-0 w-64 bg-white z-50 shadow-2xl p-6 lg:hidden"
             >
               <div className="flex items-center gap-2 mb-10">
-                <div className="w-8 h-8 bg-[#006A4E] rounded-lg flex items-center justify-center text-white">
-                  <TrendingUp size={20} />
+                <div className="w-8 h-8 bg-[#1F1815] rounded-lg flex items-center justify-center text-white">
+                  {showLogoImage ? (
+                    <img
+                      src="/logo-new.png"
+                      alt="Finora logo"
+                      className="w-full h-full object-contain"
+                      onError={() => setShowLogoImage(false)}
+                    />
+                  ) : (
+                    <TrendingUp size={20} />
+                  )}
                 </div>
                 <span className="text-xl font-serif font-bold text-[#006A4E]">FINORA</span>
               </div>

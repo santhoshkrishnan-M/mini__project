@@ -4,72 +4,25 @@ const STOCK_DATA_API_KEY = process.env.STOCK_DATA_API_KEY || "";
 const BASE_URL = "https://api.stockdata.org/v1";
 const NEWS_API_KEY = process.env.NEWS_API_KEY || ""; // NewsAPI key for financial news
 
-// Fetch financial news from NewsAPI
-async function fetchFinancialNews(): Promise<StockNews['data']> {
+export async function fetchMarketNews(forceRefresh = false): Promise<StockNews['data']> {
+  const endpoint = forceRefresh ? '/api/market/news?force=true' : '/api/market/news';
+
   try {
-    // Fetch from multiple sources for comprehensive coverage
-    const queries = [
-      'stock market OR shares OR NSE OR BSE OR sensex OR nifty',
-      'stocks AND (India OR BSE OR NSE)',
-      'stock market news India'
-    ];
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error(`News endpoint failed: ${response.status}`);
+    }
 
-    const newsPromises = queries.map(async (query) => {
-      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=10&apiKey=${NEWS_API_KEY}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.warn(`NewsAPI request failed: ${response.status}`);
-        return [];
-      }
-      
-      const data = await response.json();
-      return data.articles || [];
-    });
-
-    const allNewsArrays = await Promise.all(newsPromises);
-    const allNews = allNewsArrays.flat();
-
-    // Remove duplicates based on title and format for our interface
-    const uniqueNews = Array.from(
-      new Map(
-        allNews.map((article: any) => [
-          article.title,
-          {
-            uuid: article.url,
-            title: article.title,
-            description: article.description || article.content || '',
-            snippet: article.description?.substring(0, 150) || '',
-            url: article.url,
-            image_url: article.urlToImage || '',
-            language: 'en',
-            published_at: article.publishedAt,
-            source: article.source?.name || 'Unknown',
-            relevance_score: null,
-            entities: [],
-            similar: []
-          }
-        ])
-      ).values()
-    );
-
-    // Sort by date (newest first) and return top 20
-    return uniqueNews
-      .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
-      .slice(0, 20);
+    const data = await response.json();
+    return data.news || [];
   } catch (error) {
     console.error("Error fetching financial news:", error);
-    
-    // Fallback to StockData.org API if NewsAPI fails
-    try {
-      const newsResponse = await fetch(`${BASE_URL}/news?api_token=${STOCK_DATA_API_KEY}`);
-      const newsData: StockNews = await newsResponse.json();
-      return newsData.data || [];
-    } catch (fallbackError) {
-      console.error("Fallback news fetch also failed:", fallbackError);
-      return [];
-    }
+    return [];
   }
+}
+
+async function fetchFinancialNews(): Promise<StockNews['data']> {
+  return fetchMarketNews(false);
 }
 
 export async function fetchMarketData(): Promise<MarketData> {

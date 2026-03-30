@@ -10,12 +10,13 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Newspaper,
+  RefreshCw,
   LayoutDashboard,
   PieChart as PieChartIcon,
   Languages
 } from 'lucide-react';
 import { MarketData, Language } from '../types';
-import { fetchMarketData } from '../services/stockApi';
+import { fetchMarketData, fetchMarketNews } from '../services/stockApi';
 import { getMarketExplanation } from '../services/gemini';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -34,6 +35,20 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [explanation, setExplanation] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
+
+  const isTodayNews = (publishedAt: string) => {
+    const istDateFormat = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const publishedIstDate = istDateFormat.format(new Date(publishedAt));
+    const todayIstDate = istDateFormat.format(new Date());
+    return publishedIstDate === todayIstDate;
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -55,7 +70,26 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
       }
     };
     loadData();
+    // Refresh every hour to keep news and commodity updates current.
+    const interval = setInterval(loadData, 60 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  const refreshNewsOnly = async () => {
+    try {
+      setNewsRefreshing(true);
+      const freshNews = await fetchMarketNews(true);
+      const todaysNews = freshNews.filter((item) => isTodayNews(item.published_at));
+      setMarketData((prev) => {
+        if (!prev) return prev;
+        return { ...prev, news: todaysNews };
+      });
+    } catch (error) {
+      console.error("Error refreshing news:", error);
+    } finally {
+      setNewsRefreshing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -197,10 +231,23 @@ export default function Dashboard({ t, setLanguage, currentLanguage }: Dashboard
         {/* Sidebar: News & Quick Stats */}
         <div className="space-y-8">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-bold flex items-center gap-2 mb-4">
-              <Newspaper size={20} className="text-blue-500" />
-              {t.latestNews}
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold flex items-center gap-2">
+                <Newspaper size={20} className="text-blue-500" />
+                {t.latestNews}
+              </h3>
+              <button
+                onClick={refreshNewsOnly}
+                disabled={newsRefreshing}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:text-[#006A4E] hover:border-[#006A4E]/40 transition-colors disabled:opacity-50"
+                title={t.refreshNews || 'Refresh News'}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <RefreshCw size={12} className={cn(newsRefreshing && 'animate-spin')} />
+                  {t.refreshNews || 'Refresh News'}
+                </span>
+              </button>
+            </div>
             <div className="space-y-4">
               {marketData?.news && marketData.news.length > 0 ? (
                 marketData.news.slice(0, 8).map((item, i) => {

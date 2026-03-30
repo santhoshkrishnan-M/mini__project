@@ -44,8 +44,184 @@ if (!balanceRow) {
 async function startServer() {
   const app = express();
   const PORT = 3000;
+  const NEWS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  let newsCache: { updatedAt: number; data: any[] } = { updatedAt: 0, data: [] };
 
   app.use(express.json());
+
+  const stripHtml = (value: string) => value.replace(/<[^>]*>/g, "").trim();
+
+  const decodeEntities = (value: string) => {
+    return value
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, " ");
+  };
+
+  const extractTag = (xml: string, tag: string) => {
+    const regex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i");
+    const match = xml.match(regex);
+    return match ? stripHtml(decodeEntities(match[1])) : "";
+  };
+
+  const parseRssItems = (xml: string, source: string, limit: number) => {
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    const items: any[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = itemRegex.exec(xml)) !== null && items.length < limit) {
+      const itemXml = match[1];
+      const title = extractTag(itemXml, "title");
+      const link = extractTag(itemXml, "link");
+      const description = extractTag(itemXml, "description");
+      const pubDate = extractTag(itemXml, "pubDate");
+
+      if (!title || !link) continue;
+
+      items.push({
+        uuid: link,
+        title,
+        description,
+        snippet: description.slice(0, 160),
+        url: link,
+        image_url: "",
+        language: "en",
+        published_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        source,
+        relevance_score: null,
+        entities: [],
+        similar: []
+      });
+    }
+
+    return items;
+  };
+
+  const fetchGoogleNewsRss = async (query: string, source: string, limit = 8) => {
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed RSS fetch for ${query}: ${response.status}`);
+    }
+    const xml = await response.text();
+    return parseRssItems(xml, source, limit);
+  };
+
+  const fetchMetalSpot = async (symbol: "XAU" | "XAG") => {
+    try {
+      const response = await fetch(`https://api.gold-api.com/price/${symbol}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (typeof data.price !== "number") return null;
+      return {
+        symbol,
+        price: data.price,
+        currency: data.currency || "USD",
+        timestamp: data.updatedAt || new Date().toISOString()
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const buildCommodityNews = async () => {
+    const [gold, silver] = await Promise.all([fetchMetalSpot("XAU"), fetchMetalSpot("XAG")]);
+    const now = new Date().toISOString();
+    const items: any[] = [];
+
+    if (gold) {
+      items.push({
+        uuid: `commodity-gold-${new Date(now).toISOString().slice(0, 10)}`,
+        title: `Gold Spot (XAU): ${gold.currency} ${gold.price.toFixed(2)}`,
+        description: `Live gold spot price update for today. Updated at ${new Date(gold.timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.`,
+        snippet: `Gold spot is ${gold.currency} ${gold.price.toFixed(2)} per ounce.`,
+        url: "https://www.investing.com/commodities/gold",
+        image_url: "",
+        language: "en",
+        published_at: now,
+        source: "Gold Spot",
+        relevance_score: null,
+        entities: [],
+        similar: []
+      });
+    }
+
+    if (silver) {
+      items.push({
+        uuid: `commodity-silver-${new Date(now).toISOString().slice(0, 10)}`,
+        title: `Silver Spot (XAG): ${silver.currency} ${silver.price.toFixed(2)}`,
+        description: `Live silver spot price update for today. Updated at ${new Date(silver.timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.`,
+        snippet: `Silver spot is ${silver.currency} ${silver.price.toFixed(2)} per ounce.`,
+        url: "https://www.investing.com/commodities/silver",
+        image_url: "",
+        language: "en",
+        published_at: now,
+        source: "Silver Spot",
+        relevance_score: null,
+        entities: [],
+        similar: []
+      });
+    }
+
+    return items;
+  };
+
+  app.get("/api/market/news", async (req, res) => {
+    try {
+      const now = Date.now();
+      const forceRefresh = String(req.query.force || "").toLowerCase() === "true";
+
+      if (!forceRefresh && newsCache.data.length > 0 && now - newsCache.updatedAt < NEWS_CACHE_TTL_MS) {
+        return res.json({
+          news: newsCache.data,
+          updatedAt: new Date(newsCache.updatedAt).toISOString(),
+          cached: true
+        });
+      }
+
+      const queries = [
+        { q: "Indian stock market NSE BSE Sensex Nifty shares", source: "Google News" },
+        { q: "Indian mutual fund SIP AMC fund house NAV", source: "Google News" },
+        { q: "Indian banking sector RBI bank stocks PSU bank private bank", source: "Google News" },
+        { q: "Gold price India bullion market", source: "Google News" },
+        { q: "Silver price India bullion market", source: "Google News" }
+      ];
+
+      const rssResults = await Promise.all(
+        queries.map(async ({ q, source }) => {
+          try {
+            return await fetchGoogleNewsRss(q, source, 10);
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const commodityNews = await buildCommodityNews();
+      const categoryHeads = rssResults
+        .map((items) => items[0])
+        .filter(Boolean);
+
+      const merged = [...commodityNews, ...categoryHeads, ...rssResults.flat()];
+      const deduped = Array.from(
+        new Map(merged.map((item) => [item.title, item])).values()
+      ).sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
+
+      newsCache = { updatedAt: now, data: deduped.slice(0, 25) };
+
+      res.json({
+        news: newsCache.data,
+        updatedAt: new Date(newsCache.updatedAt).toISOString(),
+        cached: false
+      });
+    } catch (error) {
+      console.error("Error fetching market news:", error);
+      res.status(500).json({ error: "Failed to fetch market news", news: [] });
+    }
+  });
 
   // Comprehensive NSE Stock List with Accurate Price Ranges (March 2026)
   const NSE_STOCKS = [
